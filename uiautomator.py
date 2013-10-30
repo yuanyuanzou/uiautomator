@@ -11,6 +11,8 @@ import itertools
 import tempfile
 import json
 import hashlib
+import re
+import xml.etree.ElementTree as etree
 
 try:
     import urllib2
@@ -363,7 +365,8 @@ class AutomatorDevice(object):
     }
 
     def __call__(self, **kwargs):
-        return AutomatorDeviceObject(self, Selector(**kwargs))
+        # return AutomatorDeviceObject(self, Selector(**kwargs))
+        return AutomatorDeviceXMLObject(self, Selector(**kwargs))
 
     def __getattr__(self, attr):
         '''alias of fields in info property.'''
@@ -959,5 +962,216 @@ class AutomatorDeviceObject(AutomatorDeviceUiObject):
             elif action == "to":
                 return __scroll_to(vertical, **kwargs)
         return _scroll
+
+class AutomatorDeviceXMLObject(AutomatorDeviceObject):
+    '''
+        use xml to do selector
+    '''
+    def __init__(self, device, selector, bounds = None):
+
+        super(AutomatorDeviceXMLObject, self).__init__(device, selector)
+
+        self.parsexml = os.path.expanduser("~") + os.sep + "hierarchy.xml"
+        self.device.dump(self.parsexml)
+        self.bounds = bounds
+        # self.info = info
+        self.dict1 = {
+            'text' : 'text',
+            'className' :'class',
+            'description': 'content-desc',
+            'checkable':'checkable',
+            'checked':'checked',
+            'clickable':'clickable',
+            'longClickable':'long-clickable',
+            'scrollable':'scrollable',
+            'enabled':'enabled',
+            'focusable':'focusable',
+            'focused':'focused',
+            'selected':'selected',
+            'packageName':'package',
+            'resourceId':'resource-id',
+            'index':'index'
+
+        }
+        self.dict2 = {
+            'textContains':'text',
+            'descriptionContains' : 'content-desc'
+        }
+        self.dict3 = {
+            'textMatches': 'text',
+            'classNameMatches': 'class',
+            'descriptionMatches': 'content-desc',
+            'packageNameMatches': 'package',
+            'resourceIdMatches': 'resourceId'
+        }
+        self.dict4 = {
+            'textStartsWith': 'text',
+            'descriptionStartsWith': 'content-desc'
+        }
+
+    def rootxml(self):
+        root_em = None
+        try:
+            parse_tree = etree.parse(self.parsexml)
+            root_em = parse_tree.getroot()
+        except etree.ParseError:
+            LOGGER.error("[ Error: hierarchy can not be download]\n")
+        return root_em
+
+    def check_exist(self):
+        root_em = self.rootxml()
+        tmp_status = []
+        exist_count = 0
+        exsit_content = []
+        i = 0
+        for em_list in root_em.getiterator('node'):
+            tmp_exsit_content = {}
+            for key in self.selector:
+                if key in self.dict1:
+                    attr = self.dict1[key]
+                    if em_list.get(attr):
+                        if self.selector[key] == em_list.get(attr):
+                            tmp_status.append('True')
+                            tmp_exsit_content['instance'] = i
+                            self.items_coverto_json(tmp_exsit_content, em_list)
+                            i = i+1
+                        else:
+                            tmp_status.append('False')
+                    else:
+                        tmp_status.append('False')
+
+                if key in self.dict2:
+                    attr = self.dict2[key]
+                    if em_list.get(attr):
+                        if self.selector[key] in em_list.get(attr):
+                            tmp_status.append('True')
+                            tmp_exsit_content['instance'] = i
+                            self.items_coverto_json(tmp_exsit_content, em_list)
+                            i = i+1
+                        else:
+                            tmp_status.append('False')
+                    else:
+                        tmp_status.append('False')
+
+                if key in self.dict3:
+                    attr = self.dict3[key]
+                    value = self.selector[key]
+                    pattern = re.compile(value)
+                    if em_list.get(attr):
+                        if pattern.match(em_list.get(attr)) :
+                            tmp_status.append('True')
+                            tmp_exsit_content['instance'] = i
+                            self.items_coverto_json(tmp_exsit_content, em_list)
+                            i = i+1
+                        else:
+                            tmp_status.append('False')
+                    else:
+                        tmp_status.append('False')
+
+                if key in self.dict4:
+                    attr = self.dict4[key]
+                    if em_list.get(attr):
+                        if em_list.get(attr).startswith(self.selector[key]):
+                            tmp_status.append('True')
+                            tmp_exsit_content['instance'] = i
+                            self.items_coverto_json(tmp_exsit_content, em_list)
+                            i = i+1
+                        else:
+                            tmp_status.append('False')
+                    else:
+                        tmp_status.append('False')
+
+            if tmp_exsit_content:
+                exsit_content.append(tmp_exsit_content)
+
+            if "False" not in tmp_status and tmp_status:
+                exist_count +=1
+                tmp_status = []
+            else:
+                tmp_status = []
+        return exsit_content
+
+    def items_coverto_json(self, exsit_content_json, element_xml):
+        for em_key in element_xml.keys():
+            if em_key == 'bounds':
+                bounds_data = element_xml.get(em_key)
+                bounds_datas = re.search(r'\[(\d+),(\d+)\]\[(\d+),(\d+)\]', bounds_data)
+                boudns_json = {
+                    'left': int(bounds_datas.group(1)),
+                    'top' : int(bounds_datas.group(2)),
+                    'right': int(bounds_datas.group(3)),
+                    'bottom': int(bounds_datas.group(4))
+                }
+                exsit_content_json['bounds'] = boudns_json
+            elif em_key == 'index':
+                exsit_content_json[dict_key] = int(element_xml.get(em_key))
+            else:
+                for dict_key in self.dict1:
+                    if  self.dict1[dict_key] == em_key:
+                        if element_xml.get(em_key) == 'true':
+                            exsit_content_json[dict_key] = True;
+                        elif element_xml.get(em_key) in 'false':
+                            exsit_content_json[dict_key] = False;
+                        else :
+                            exsit_content_json[dict_key] = element_xml.get(em_key)
+
+        return exsit_content_json
+
+    @property
+    def exists(self):
+        exsit_count = len(self.check_exist())
+        if exsit_count >0 :
+            return True
+        else:
+            return False
+
+    @property
+    def count(self):
+        exsit_count = len(self.check_exist())
+        return exsit_count
+
+    @property
+    def click(self):
+        if self.bounds:
+            object_point = self.bounds
+        else:
+            object_point = self.check_exist()[0]['bounds']
+        x = (object_point['right']-object_point['left'])/2 +object_point['left']
+        y = (object_point['bottom']-object_point['top'])/2 +object_point['top']
+        return self.device.click(x,y)
+
+    def right(self, **kwargs):
+        def onrightof(rect1, rect2):
+            left, top, right, bottom = intersect(rect1, rect2)
+            return top < bottom and rect2["left"] >= rect1["right"]
+        return self.__view_beside(onrightof, **kwargs)
+
+    def left(self, **kwargs):
+        def onleftof(rect1, rect2):
+            left, top, right, bottom = intersect(rect1, rect2)
+            return top < bottom and rect2["right"] <= rect1["left"]
+        return self.__view_beside(onleftof, **kwargs)
+
+    def up(self, **kwargs):
+        def above(rect1, rect2):
+            left, top, right, bottom = intersect(rect1, rect2)
+            return left < right and rect2["bottom"] <= rect1["top"]
+        return self.__view_beside(above, **kwargs)
+
+    def down(self, **kwargs):
+        def under(rect1, rect2):
+            left, top, right, bottom = intersect(rect1, rect2)
+            return left < right and rect2["top"] >= rect1["bottom"]
+        return self.__view_beside(under, **kwargs)
+
+    def __view_beside(self, onsideof, **kwargs):
+        origin_bounds = self.info["bounds"]
+        self.selector = Selector(**kwargs)
+        for item in self.check_exist():
+            if onsideof(origin_bounds, item["bounds"]):
+                print 'item'
+                self.bounds = item["bounds"]
+                del item["bounds"]
+                return AutomatorDeviceXMLObject(self.device, item, self.bounds)
 
 device = AutomatorDevice()
