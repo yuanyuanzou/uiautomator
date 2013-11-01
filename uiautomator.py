@@ -970,11 +970,9 @@ class AutomatorDeviceXMLObject(AutomatorDeviceObject):
     def __init__(self, device, selector, bounds = None):
 
         super(AutomatorDeviceXMLObject, self).__init__(device, selector)
-
         self.parsexml = os.path.expanduser("~") + os.sep + "hierarchy.xml"
         self.device.dump(self.parsexml)
         self.bounds = bounds
-        # self.info = info
         self.dict1 = {
             'text' : 'text',
             'className' :'class',
@@ -1018,8 +1016,31 @@ class AutomatorDeviceXMLObject(AutomatorDeviceObject):
             LOGGER.error("[ Error: hierarchy can not be download]\n")
         return root_em
 
-    def check_exist(self):
+    def check_child_exsit(self):
+        parents = self.check_exist()
         root_em = self.rootxml()
+        parents_xml = None
+        if  'child' in self.selector['childOrSibling']:
+            for prem_list in root_em.getiterator('node'):
+                bounds_data = prem_list.get('bounds')
+                bounds_datas = re.search(r'\[(\d+),(\d+)\]\[(\d+),(\d+)\]', bounds_data)
+                for parent_item in parents:
+                    if int(bounds_datas.group(1)) == parent_item['bounds']['left'] \
+                    and int(bounds_datas.group(2)) == parent_item['bounds']['top'] \
+                    and int(bounds_datas.group(3)) == parent_item['bounds']['right'] \
+                    and int(bounds_datas.group(4)) == parent_item['bounds']['bottom'] \
+                    and parent_item['className'] == prem_list.get('class') \
+                    and parent_item['packageName'] == prem_list.get('package'):
+                        parents_xml = prem_list
+                        continue
+            self.selector = self.selector['childOrSiblingSelector'][0]
+            self.check_exist(parents_xml)
+
+    def check_exist(self, check_xml = None):
+        if check_xml is not None:
+            root_em =check_xml
+        else:
+            root_em = self.rootxml()
         tmp_status = []
         exist_count = 0
         exsit_content = []
@@ -1089,7 +1110,11 @@ class AutomatorDeviceXMLObject(AutomatorDeviceObject):
                 tmp_status = []
             else:
                 tmp_status = []
-        return exsit_content
+
+        if exsit_content:
+            return exsit_content
+        else:
+            raise Exception ("Error response,Error message: UiSelector % s not found \n" % self.selector)
 
     def items_coverto_json(self, exsit_content_json, element_xml):
         for em_key in element_xml.keys():
@@ -1132,13 +1157,27 @@ class AutomatorDeviceXMLObject(AutomatorDeviceObject):
 
     @property
     def click(self):
-        if self.bounds:
-            object_point = self.bounds
-        else:
-            object_point = self.check_exist()[0]['bounds']
-        x = (object_point['right']-object_point['left'])/2 +object_point['left']
-        y = (object_point['bottom']-object_point['top'])/2 +object_point['top']
-        return self.device.click(x,y)
+        def _click():
+            if self.bounds:
+                object_point = self.bounds
+            else:
+                object_point = self.check_exist()[0]['bounds']
+            x = (object_point['right']-object_point['left'])/2 +object_point['left']
+            y = (object_point['bottom']-object_point['top'])/2 +object_point['top']
+            return self.device.click(x,y)
+        return _click
+
+
+    def child(self, **kwargs):
+        '''set chileSelector.'''
+        self.selector.child(**kwargs)
+        self.check_child_exsit()
+        return self
+
+    # def sibling(self, **kwargs):
+    #     '''set fromParent selector.'''
+    #     self.selector.sibling(**kwargs)
+    #     return self
 
     def right(self, **kwargs):
         def onrightof(rect1, rect2):
