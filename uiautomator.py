@@ -1039,7 +1039,7 @@ class AutomatorDeviceXMLObject(AutomatorDeviceObject):
     def check_silbing_exsit(self):
         childs = self.check_exist()[0]
         root_em = self.rootxml()
-        parents_xml = None
+        parents_xml = []
         if  'sibling' in self.selector['childOrSibling']:
             for prem_list in root_em.getiterator('node'):
                 for child_item in prem_list.getchildren():
@@ -1051,7 +1051,7 @@ class AutomatorDeviceXMLObject(AutomatorDeviceObject):
                     and int(bounds_datas.group(4)) == childs['bounds']['bottom'] \
                     and childs['className'] == child_item.get('class') \
                     and childs['packageName'] == child_item.get('package'):
-                        parents_xml = prem_list
+                        parents_xml.append(prem_list)
                         continue
             self.selector = self.selector['childOrSiblingSelector'][0]
             # self.selector["instance"] = 1
