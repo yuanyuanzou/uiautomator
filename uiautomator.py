@@ -1019,7 +1019,7 @@ class AutomatorDeviceXMLObject(AutomatorDeviceObject):
     def check_child_exsit(self):
         parents = self.check_exist()
         root_em = self.rootxml()
-        parents_xml = None
+        parents_xml = []
         if  'child' in self.selector['childOrSibling']:
             for prem_list in root_em.getiterator('node'):
                 bounds_data = prem_list.get('bounds')
@@ -1031,88 +1031,114 @@ class AutomatorDeviceXMLObject(AutomatorDeviceObject):
                     and int(bounds_datas.group(4)) == parent_item['bounds']['bottom'] \
                     and parent_item['className'] == prem_list.get('class') \
                     and parent_item['packageName'] == prem_list.get('package'):
+                        parents_xml.append(prem_list)
+                        continue
+            self.selector = self.selector['childOrSiblingSelector'][0]
+            return self.check_exist(parents_xml)
+
+    def check_silbing_exsit(self):
+        childs = self.check_exist()[0]
+        root_em = self.rootxml()
+        parents_xml = None
+        if  'sibling' in self.selector['childOrSibling']:
+            for prem_list in root_em.getiterator('node'):
+                for child_item in prem_list.getchildren():
+                    bounds_data = child_item.get('bounds')
+                    bounds_datas = re.search(r'\[(\d+),(\d+)\]\[(\d+),(\d+)\]', bounds_data)
+                    if int(bounds_datas.group(1)) == childs['bounds']['left'] \
+                    and int(bounds_datas.group(2)) == childs['bounds']['top'] \
+                    and int(bounds_datas.group(3)) == childs['bounds']['right'] \
+                    and int(bounds_datas.group(4)) == childs['bounds']['bottom'] \
+                    and childs['className'] == child_item.get('class') \
+                    and childs['packageName'] == child_item.get('package'):
                         parents_xml = prem_list
                         continue
             self.selector = self.selector['childOrSiblingSelector'][0]
+            # self.selector["instance"] = 1
             self.check_exist(parents_xml)
 
     def check_exist(self, check_xml = None):
+        root_em_array = []
         if check_xml is not None:
-            root_em =check_xml
+            root_em_array = check_xml
         else:
-            root_em = self.rootxml()
+            root_em_array.append(self.rootxml())
         tmp_status = []
         exist_count = 0
-        exsit_content = []
+        exsit_contents = []
         i = 0
-        for em_list in root_em.getiterator('node'):
-            tmp_exsit_content = {}
-            for key in self.selector:
-                if key in self.dict1:
-                    attr = self.dict1[key]
-                    if em_list.get(attr):
-                        if self.selector[key] == em_list.get(attr):
-                            tmp_status.append('True')
-                            tmp_exsit_content['instance'] = i
-                            self.items_coverto_json(tmp_exsit_content, em_list)
-                            i = i+1
+        for root_em in root_em_array:
+            for em_list in root_em.getiterator('node'):
+                tmp_exsit_content = {}
+                for key in self.selector:
+                    if key in self.dict1:
+                        attr = self.dict1[key]
+                        if em_list.get(attr):
+                            if self.selector[key] == em_list.get(attr):
+                                tmp_status.append('True')
+                                # tmp_exsit_content['instance'] = i
+                                self.items_coverto_json(tmp_exsit_content, em_list)
+                                i = i+1
+                            else:
+                                tmp_status.append('False')
                         else:
                             tmp_status.append('False')
-                    else:
-                        tmp_status.append('False')
 
-                if key in self.dict2:
-                    attr = self.dict2[key]
-                    if em_list.get(attr):
-                        if self.selector[key] in em_list.get(attr):
-                            tmp_status.append('True')
-                            tmp_exsit_content['instance'] = i
-                            self.items_coverto_json(tmp_exsit_content, em_list)
-                            i = i+1
+                    if key in self.dict2:
+                        attr = self.dict2[key]
+                        if em_list.get(attr):
+                            if self.selector[key] in em_list.get(attr):
+                                tmp_status.append('True')
+                                # tmp_exsit_content['instance'] = i
+                                self.items_coverto_json(tmp_exsit_content, em_list)
+                                i = i+1
+                            else:
+                                tmp_status.append('False')
                         else:
                             tmp_status.append('False')
-                    else:
-                        tmp_status.append('False')
 
-                if key in self.dict3:
-                    attr = self.dict3[key]
-                    value = self.selector[key]
-                    pattern = re.compile(value)
-                    if em_list.get(attr):
-                        if pattern.match(em_list.get(attr)) :
-                            tmp_status.append('True')
-                            tmp_exsit_content['instance'] = i
-                            self.items_coverto_json(tmp_exsit_content, em_list)
-                            i = i+1
+                    if key in self.dict3:
+                        attr = self.dict3[key]
+                        value = self.selector[key]
+                        pattern = re.compile(value)
+                        if em_list.get(attr):
+                            if pattern.match(em_list.get(attr)) :
+                                tmp_status.append('True')
+                                # tmp_exsit_content['instance'] = i
+                                self.items_coverto_json(tmp_exsit_content, em_list)
+                                i = i+1
+                            else:
+                                tmp_status.append('False')
                         else:
                             tmp_status.append('False')
-                    else:
-                        tmp_status.append('False')
 
-                if key in self.dict4:
-                    attr = self.dict4[key]
-                    if em_list.get(attr):
-                        if em_list.get(attr).startswith(self.selector[key]):
-                            tmp_status.append('True')
-                            tmp_exsit_content['instance'] = i
-                            self.items_coverto_json(tmp_exsit_content, em_list)
-                            i = i+1
+                    if key in self.dict4:
+                        attr = self.dict4[key]
+                        if em_list.get(attr):
+                            if em_list.get(attr).startswith(self.selector[key]):
+                                tmp_status.append('True')
+                                # tmp_exsit_content['instance'] = i
+                                self.items_coverto_json(tmp_exsit_content, em_list)
+                                i = i+1
+                            else:
+                                tmp_status.append('False')
                         else:
                             tmp_status.append('False')
-                    else:
-                        tmp_status.append('False')
-
-            if tmp_exsit_content:
-                exsit_content.append(tmp_exsit_content)
-
-            if "False" not in tmp_status and tmp_status:
-                exist_count +=1
-                tmp_status = []
-            else:
-                tmp_status = []
-
-        if exsit_content:
-            return exsit_content
+                if "False" not in tmp_status:
+                    exist_count +=1
+                    tmp_status = []
+                    if tmp_exsit_content:
+                        mark = True
+                        if len(exsit_contents) >0:
+                            for exist_content in exsit_contents:
+                                if cmp(tmp_exsit_content,exist_content)==0:
+                                    mark = False
+                        if mark:
+                            exsit_contents.append(tmp_exsit_content)
+                else:
+                    tmp_status = []
+        if exsit_contents:
+            return exsit_contents
         else:
             raise Exception ("Error response,Error message: UiSelector % s not found \n" % self.selector)
 
@@ -1155,17 +1181,17 @@ class AutomatorDeviceXMLObject(AutomatorDeviceObject):
         exsit_count = len(self.check_exist())
         return exsit_count
 
-    @property
-    def click(self):
-        def _click():
-            if self.bounds:
-                object_point = self.bounds
-            else:
-                object_point = self.check_exist()[0]['bounds']
-            x = (object_point['right']-object_point['left'])/2 +object_point['left']
-            y = (object_point['bottom']-object_point['top'])/2 +object_point['top']
-            return self.device.click(x,y)
-        return _click
+    # @property
+    # def click(self):
+    #     def _click():
+    #         if self.bounds:
+    #             object_point = self.bounds
+    #         else:
+    #             object_point = self.check_exist()[0]['bounds']
+    #         x = (object_point['right']-object_point['left'])/2 +object_point['left']
+    #         y = (object_point['bottom']-object_point['top'])/2 +object_point['top']
+    #         return self.device.click(x,y)
+    #     return _click
 
 
     def child(self, **kwargs):
@@ -1174,10 +1200,12 @@ class AutomatorDeviceXMLObject(AutomatorDeviceObject):
         self.check_child_exsit()
         return self
 
-    # def sibling(self, **kwargs):
-    #     '''set fromParent selector.'''
-    #     self.selector.sibling(**kwargs)
-    #     return self
+    def sibling(self, **kwargs):
+        '''set fromParent selector.'''
+        self.selector.sibling(**kwargs)
+        self.check_silbing_exsit()
+        return self
+
 
     def right(self, **kwargs):
         def onrightof(rect1, rect2):
@@ -1208,7 +1236,6 @@ class AutomatorDeviceXMLObject(AutomatorDeviceObject):
         self.selector = Selector(**kwargs)
         for item in self.check_exist():
             if onsideof(origin_bounds, item["bounds"]):
-                print 'item'
                 self.bounds = item["bounds"]
                 del item["bounds"]
                 return AutomatorDeviceXMLObject(self.device, item, self.bounds)
