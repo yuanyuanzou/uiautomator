@@ -972,6 +972,7 @@ class AutomatorDeviceXMLObject(AutomatorDeviceObject):
         super(AutomatorDeviceXMLObject, self).__init__(device, selector)
         self.parsexml = os.path.expanduser("~") + os.sep + "hierarchy.xml"
         self.device.dump(self.parsexml)
+
         self.bounds = bounds
         self.dict1 = {
             'text' : 'text',
@@ -1059,10 +1060,26 @@ class AutomatorDeviceXMLObject(AutomatorDeviceObject):
 
     def check_exist(self, check_xml = None):
         root_em_array = []
+        exsit_item = []
         if check_xml is not None:
-            root_em_array = check_xml
+            full_exsit = []
+            root_em_array.append(self.rootxml())
+            part_em_array = check_xml
+            exsit_item = self.check_exist_by_xml(part_em_array)
+            full_exsit = self.check_exist_by_xml(root_em_array)
+            full_exsit = self.bounds_to_instance(full_exsit)
+            exsit_item = self.part_in_full(exsit_item,full_exsit)
+            if len(exsit_item) == 1:
+                self.selector['instance']=exsit_item[0]['instance']
+            return exsit_item
         else:
             root_em_array.append(self.rootxml())
+            exsit_item = self.check_exist_by_xml(root_em_array)
+            self.bounds_to_instance(exsit_item)
+            exsit_item = self.part_in_full(exsit_item,exsit_item)
+            return exsit_item
+
+    def check_exist_by_xml(self, root_em_array):
         tmp_status = []
         exist_count = 0
         exsit_contents = []
@@ -1138,7 +1155,9 @@ class AutomatorDeviceXMLObject(AutomatorDeviceObject):
                 else:
                     tmp_status = []
         if exsit_contents:
+            # self.bounds_to_instance(exsit_contents)
             return exsit_contents
+
         else:
             raise Exception ("Error response,Error message: UiSelector % s not found \n" % self.selector)
 
@@ -1168,6 +1187,28 @@ class AutomatorDeviceXMLObject(AutomatorDeviceObject):
 
         return exsit_content_json
 
+    def part_in_full(self, part, full):
+
+        for i in range(len(part)):
+            for j in range(len(full)):
+                if cmp(part[i],full[j]) == 0:
+                    part[i]['instance'] = j
+        return part
+
+    def bounds_to_instance(self, exists_contents):
+        if len(exists_contents) == 1:
+            return exists_contents
+        else:
+            count = len(exists_contents)
+            for i in range(count-1):
+                for j in range(count-i-1):
+                    if exists_contents[j]['bounds']['top'] > exists_contents[j+1]['bounds']['top']:
+                        exists_contents[j], exists_contents[j+1] = exists_contents[j+1], exists_contents[j]
+                    if exists_contents[j]['bounds']['top'] == exists_contents[j+1]['bounds']['top']:
+                        if exists_contents[j]['bounds']['left'] > exists_contents[j+1]['bounds']['left']:
+                            exists_contents[j], exists_contents[j+1] = exists_contents[j+1], exists_contents[j]
+            return exists_contents
+
     @property
     def exists(self):
         exsit_count = len(self.check_exist())
@@ -1181,17 +1222,17 @@ class AutomatorDeviceXMLObject(AutomatorDeviceObject):
         exsit_count = len(self.check_exist())
         return exsit_count
 
-    # @property
-    # def click(self):
-    #     def _click():
-    #         if self.bounds:
-    #             object_point = self.bounds
-    #         else:
-    #             object_point = self.check_exist()[0]['bounds']
-    #         x = (object_point['right']-object_point['left'])/2 +object_point['left']
-    #         y = (object_point['bottom']-object_point['top'])/2 +object_point['top']
-    #         return self.device.click(x,y)
-    #     return _click
+    @property
+    def click(self):
+        def _click():
+            if self.bounds:
+                object_point = self.bounds
+            else:
+                object_point = self.check_exist()[0]['bounds']
+            x = (object_point['right']-object_point['left'])/2 +object_point['left']
+            y = (object_point['bottom']-object_point['top'])/2 +object_point['top']
+            return self.device.click(x,y)
+        return _click
 
 
     def child(self, **kwargs):
