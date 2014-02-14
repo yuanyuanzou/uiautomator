@@ -1227,6 +1227,9 @@ class AutomatorDeviceXMLObject(AutomatorDeviceObject):
         def _click():
             if self.bounds:
                 object_point = self.bounds
+            elif self.selector['instance']:
+                obj_index = self.selector['instance']
+                object_point = self.check_exist()[obj_index]['bounds']
             else:
                 object_point = self.check_exist()[0]['bounds']
             x = (object_point['right']-object_point['left'])/2 +object_point['left']
